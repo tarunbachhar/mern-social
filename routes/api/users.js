@@ -5,6 +5,11 @@ const gravatar = require("gravatar");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const keys = require("../../config/keys");
+const passport = require("passport");
+
+//Load input validation
+const validateRegisterInput = require("../../validation/registration");
+const validateLoginInput = require("../../validation/login");
 
 // @route GET api/users/test
 // @desc TEsts user route
@@ -15,9 +20,16 @@ router.get("/test", (req, res) => res.json({ msg: "Users works" }));
 // @desc Register user
 // @access public
 router.post("/register", (req, res) => {
+  const { errors, isValid } = validateRegisterInput(req.body);
+
+  if (!isValid) {
+    return res.status(400).json(errors);
+  }
+  console.log(req.body);
   User.findOne({ email: req.body.email }).then(user => {
     if (user) {
-      return res.status(400).json({ email: "Email already exists" });
+      errors.email = "Email already exists";
+      return res.status(400).json(errors);
     } else {
       const avatar = gravatar.url(req.body.email, {
         s: "200", //size
@@ -50,6 +62,12 @@ router.post("/register", (req, res) => {
 // @desc TEsts user /Returning jwt Token
 // @access public
 router.post("/login", (req, res) => {
+  const { errors, isValid } = validateLoginInput(req.body);
+
+  if (!isValid) {
+    return res.status(400).json(errors);
+  }
+
   const email = req.body.email;
   const password = req.body.password;
 
@@ -57,7 +75,8 @@ router.post("/login", (req, res) => {
 
   User.findOne({ email: email }).then(user => {
     if (!user) {
-      res.status(404).json({ email: "user email not found" });
+      errors.email = "user not found";
+      res.status(404).json(errors);
     }
     //check passowrkd
     else {
@@ -66,13 +85,13 @@ router.post("/login", (req, res) => {
           //User matched
 
           const payload = {
-            id: user._id,
+            id: user.id,
             name: user.name,
             avatar: user.avatar
           }; //create jwt payload
           //sign token
           jwt.sign(
-            { payload },
+            payload,
             keys.secretOrKey,
             { expiresIn: 3600 },
             (err, token) => {
@@ -83,11 +102,28 @@ router.post("/login", (req, res) => {
             }
           );
         } else {
-          res.status(400).json({ password: "Password Incorrect" });
+          errors.password = "Password Incorrect";
+          res.status(400).json(errors);
         }
       });
     }
   });
 });
+
+// @route GET api/users/current
+// @desc return current user
+// @access private
+
+router.get(
+  "/current",
+  passport.authenticate("jwt", { session: false }),
+  (req, res) => {
+    res.json({
+      id: req.user.id,
+      name: req.user.name,
+      email: req.user.email
+    });
+  }
+);
 
 module.exports = router;
