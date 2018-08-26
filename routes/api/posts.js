@@ -216,7 +216,7 @@ router.delete(
           .indexOf(req.params.commentId);
 
         //splice from the array
-        post.comment.splice(removeIndex, 1);
+        post.comments.splice(removeIndex, 1);
 
         post.save().then(post => res.json(post));
       })
